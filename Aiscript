@@ -1,0 +1,549 @@
+-- Skynet v4+ Advanced: Mini "What AI Sees" Overlay
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "AI Auto-Pilot SKYNET v4+",
+    LoadingTitle = "Initializing Flight AI",
+    LoadingSubtitle = "Advanced Flight Control",
+    ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "SkyNet" },
+    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+    KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+
+local AIState = {
+    enabled = false,
+    mode = "STANDBY",
+    targetAltitude = 1000,
+    targetSpeed = 300,
+    engineOn = false,
+    throttle = 0,
+    gearDown = true,
+    flaps = 0,
+    aiThinking = "Initializing...",
+    currentAction = "IDLE",
+    decisionReason = "",
+    flightTime = 0,
+    distance = 0,
+    landings = 0,
+    showDebug = true,
+    showMiniAIVision = true,
+}
+
+local DebugParts = {}
+
+-- GUI
+local MainTab = Window:CreateTab("🛩️ Autopilot", 4483362458)
+local StatusLabel = MainTab:CreateLabel("Status: Ready")
+local ModeLabel = MainTab:CreateLabel("Mode: STANDBY")
+local AltLabel = MainTab:CreateLabel("Altitude: 0ft | Speed: 0 MPH")
+local ThinkingLabel = MainTab:CreateLabel("AI Thinking: Idle")
+local ActionLabel = MainTab:CreateLabel("Action: IDLE")
+local ReasonLabel = MainTab:CreateLabel("Reason: Waiting")
+
+MainTab:CreateSection("Controls")
+MainTab:CreateToggle({
+    Name = "🤖 Enable Autopilot",
+    CurrentValue = false,
+    Callback = function(Value)
+        AIState.enabled = Value
+        if Value then
+            StatusLabel:Set("Status: ✈️ AUTOPILOT ACTIVE")
+            AIState.aiThinking = "Activating..."
+        else
+            StatusLabel:Set("Status: Manual")
+            AIState.aiThinking = "Autopilot off"
+            releaseAllInputs()
+            AIState.engineOn = false
+        end
+    end,
+})
+MainTab:CreateToggle({
+    Name = "👁️ Show AI Debug Overlay",
+    CurrentValue = true,
+    Callback = function(Value)
+        AIState.showDebug = Value
+        if not Value then
+            for _, part in ipairs(DebugParts) do if part and part.Parent then part:Destroy() end end
+            DebugParts = {}
+        end
+    end,
+})
+MainTab:CreateDropdown({
+    Name = "Flight Mode",
+    Options = {"TAXI", "TAKEOFF", "CLIMB", "CRUISE", "DESCENT", "LANDING"},
+    CurrentOption = "CRUISE",
+    Callback = function(Option)
+        AIState.mode = Option
+        ModeLabel:Set("Mode: " .. Option)
+    end,
+})
+MainTab:CreateButton({
+    Name = "🛫 AUTO TAKEOFF SEQUENCE",
+    Callback = function()
+        AIState.enabled = true
+        AIState.mode = "TAKEOFF"
+        AIState.targetAltitude = 1500
+        Rayfield:Notify({Title="Takeoff Initiated",Content="AI will handle full takeoff!",Duration=3,Image=4483362458})
+    end,
+})
+MainTab:CreateButton({
+    Name = "🛬 AUTO LANDING SEQUENCE",
+    Callback = function()
+        AIState.enabled = true
+        AIState.mode = "LANDING"
+        Rayfield:Notify({Title="Landing Initiated",Content="AI will handle landing!",Duration=3,Image=4483362458})
+    end,
+})
+
+MainTab:CreateSection("Parameters")
+MainTab:CreateSlider({
+    Name="Target Altitude (ft)",Range={500,3000},Increment=100,CurrentValue=1000,Callback=function(v) AIState.targetAltitude=v end,
+})
+MainTab:CreateSlider({
+    Name="Target Speed (MPH)",Range={150,450},Increment=10,CurrentValue=300,Callback=function(v) AIState.targetSpeed=v end,
+})
+
+-- Vision GUI
+local VisionTab = Window:CreateTab("👁️ Vision", 4483362458)
+local ForwardLabel = VisionTab:CreateLabel("Forward: 0m")
+local TerrainLabel = VisionTab:CreateLabel("Terrain: 0ft")
+local PitchLabel = VisionTab:CreateLabel("Pitch: 0°")
+local RollLabel = VisionTab:CreateLabel("Roll: 0°")
+
+local StatsTab = Window:CreateTab("📊 Stats", 4483362458)
+local TimeLabel = StatsTab:CreateLabel("Flight Time: 0s")
+local DistLabel = StatsTab:CreateLabel("Distance: 0m")
+local LandLabel = StatsTab:CreateLabel("Landings: 0")
+
+-- MINI AI VISION OVERLAY
+local gui = Instance.new("ScreenGui")
+gui.Name = "_SKYNET_AIVISION"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 330, 0, 150)
+frame.Position = UDim2.new(1, -345, 1, -165)
+frame.BackgroundTransparency = 0.12
+frame.BackgroundColor3 = Color3.fromRGB(25,27,30)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+frame.Visible = true
+_G.SKYN_AIVISION_FRAME = frame
+
+local uicorner = Instance.new("UICorner")
+uicorner.CornerRadius = UDim.new(0, 8)
+uicorner.Parent = frame
+
+-- "AI Vision" Label
+local mainLabel = Instance.new("TextLabel")
+mainLabel.Size = UDim2.new(1, -8, 0, 22)
+mainLabel.Position = UDim2.new(0, 4, 0, 6)
+mainLabel.BackgroundTransparency = 1
+mainLabel.TextColor3 = Color3.new(0.9, 1, 0.8)
+mainLabel.Font = Enum.Font.GothamSemibold
+mainLabel.TextXAlignment = Enum.TextXAlignment.Left
+mainLabel.TextScaled = true
+mainLabel.Text = "AI Vision (What pilot sees)"
+mainLabel.Parent = frame
+
+local thinking = Instance.new("TextLabel", frame)
+thinking.Size = UDim2.new(1, -12, 0, 30)
+thinking.Position = UDim2.new(0, 6, 0, 36)
+thinking.BackgroundTransparency = 1
+thinking.TextColor3 = Color3.new(1,1,0.25)
+thinking.Font = Enum.Font.GothamBold
+thinking.TextXAlignment = Enum.TextXAlignment.Left
+thinking.TextScaled = true
+thinking.TextWrapped = true
+thinking.Text = "Thinking: Startup..."
+
+local action = Instance.new("TextLabel", frame)
+action.Size = UDim2.new(1, -12, 0, 22)
+action.Position = UDim2.new(0, 6, 0, 75)
+action.BackgroundTransparency = 1
+action.TextColor3 = Color3.new(0.7, 1, 0.7)
+action.Font = Enum.Font.GothamMedium
+action.TextXAlignment = Enum.TextXAlignment.Left
+action.TextScaled = true
+action.TextWrapped = true
+action.Text = "Action: IDLE"
+
+local reason = Instance.new("TextLabel", frame)
+reason.Size = UDim2.new(1, -12, 0, 32)
+reason.Position = UDim2.new(0, 6, 0, 104)
+reason.BackgroundTransparency = 1
+reason.TextColor3 = Color3.new(1,1,1)
+reason.Font = Enum.Font.Gotham
+reason.TextXAlignment = Enum.TextXAlignment.Left
+reason.TextScaled = true
+reason.TextWrapped = true
+reason.Text = "Reason: --"
+
+MainTab:CreateToggle({
+    Name = "🖼️ Mini 'What AI Sees' Screen",
+    CurrentValue = true,
+    Callback = function(Value)
+        frame.Visible = Value
+        AIState.showMiniAIVision = Value
+    end,
+})
+
+-- Input Handling
+local inputs = {W = false, S = false, G = false, B = false, F = false, R = false}
+function holdKey(key, state)
+    if inputs[key] ~= state then
+        inputs[key] = state
+        VirtualInputManager:SendKeyEvent(state, Enum.KeyCode[key], false, game)
+    end
+end
+function tapKey(keyCode)
+    VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+    wait(0.08)
+    VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+end
+function releaseAllInputs()
+    for key, _ in pairs(inputs) do holdKey(key, false) end
+    local camera = Workspace.CurrentCamera
+    if camera then
+        local vp = camera.ViewportSize
+        VirtualInputManager:SendMouseMoveEvent(vp.X/2, vp.Y/2, game)
+    end
+end
+function setThrottle(level)
+    AIState.throttle = math.clamp(level, 0, 1)
+    if level >= 0.95 then
+        holdKey("W", true)
+        holdKey("S", false)
+        AIState.currentAction = "FULL THROTTLE"
+    elseif level > 0.6 then
+        holdKey("W", true)
+        holdKey("S", false)
+        AIState.currentAction = "HIGH THROTTLE"
+    elseif level > 0.3 then
+        holdKey("W", false)
+        holdKey("S", false)
+        AIState.currentAction = "MEDIUM THROTTLE"
+    else
+        holdKey("W", false)
+        holdKey("S", true)
+        AIState.currentAction = "REDUCING THROTTLE"
+    end
+end
+function setMouseControl(pitchInput, rollInput)
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local centerX, centerY = viewport.X / 2, viewport.Y / 2
+    AIState.mouseY = (AIState.mouseY or 0) + (pitchInput - (AIState.mouseY or 0))*0.14
+    AIState.mouseX = (AIState.mouseX or 0) + (rollInput - (AIState.mouseX or 0))*0.14
+    local mouseX = centerX + (AIState.mouseX * 300)
+    local mouseY = centerY + (AIState.mouseY * 300)
+    mouseX = math.clamp(mouseX, 0, viewport.X)
+    mouseY = math.clamp(mouseY, 0, viewport.Y)
+    VirtualInputManager:SendMouseMoveEvent(math.floor(mouseX), math.floor(mouseY), game)
+end
+function setBrakes(active) holdKey("B", active) end
+function setGear(down)
+    if AIState.gearDown ~= down then
+        tapKey(Enum.KeyCode.G)
+        AIState.gearDown = down
+        AIState.aiThinking = down and "Gear DOWN" or "Gear UP"
+        wait(0.27)
+    end
+end
+function setFlaps(level)
+    if AIState.flaps ~= level then
+        tapKey(Enum.KeyCode.F)
+        AIState.flaps = level
+        wait(0.15)
+    end
+end
+
+local function createDebugRay(origin, direction, color)
+    if not AIState.showDebug then return end
+    local part = Instance.new("Part")
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Color = color
+    part.Size = Vector3.new(0.3,0.3,direction.Magnitude)
+    part.CFrame = CFrame.new(origin + direction/2, origin + direction)
+    part.Transparency = 0.4
+    part.Parent = Workspace
+    table.insert(DebugParts, part)
+    Debris:AddItem(part, 0.13)
+end
+
+function scanEnvironment(position, lookVector)
+    local vision = {forwardClear=0, obstacles=0, terrainHeight=0, obstacleAhead=false}
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {Players.LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local maxDist = 500
+    for dist=100,maxDist,100 do
+        local dir = lookVector * dist
+        local ray = Workspace:Raycast(position, dir, rayParams)
+        if ray then
+            vision.forwardClear = (ray.Position - position).Magnitude
+            vision.obstacles = vision.obstacles + 1
+            vision.obstacleAhead = vision.forwardClear < 150
+            createDebugRay(position, ray.Position - position, Color3.new(1,0,0))
+            break
+        else
+            vision.forwardClear = dist
+            createDebugRay(position, dir, Color3.new(0,1,0))
+        end
+    end
+    local downRay = Workspace:Raycast(position, Vector3.new(0,-10000,0), rayParams)
+    if downRay then
+        vision.terrainHeight = (position.Y - downRay.Position.Y)*3.28084
+        createDebugRay(position, downRay.Position - position, Color3.new(1,1,0))
+    end
+    ForwardLabel:Set(string.format("Forward: %.0fm", vision.forwardClear))
+    TerrainLabel:Set(string.format("Terrain: %.0fft", vision.terrainHeight))
+    return vision
+end
+
+function getFlightData(rootPart)
+    if not rootPart then return 0,0,0,0,0 end
+    local velocity = rootPart.AssemblyLinearVelocity
+    local speed = velocity.Magnitude * 2.23694 -- m/s to mph
+    local altitude = rootPart.Position.Y * 3.28084
+    local pitch = 0
+    if velocity.Magnitude > 1 then
+        pitch = math.deg(math.asin(math.clamp(velocity.Unit.Y, -1, 1)))
+    end
+    local roll = 0
+    local heading = math.deg(math.atan2(velocity.X, velocity.Z))
+    if heading < 0 then heading = heading + 360 end
+    AIState.altitude = altitude
+    AIState.speed = speed
+    AIState.pitch = pitch
+    AIState.roll = roll
+    AIState.heading = heading
+    PitchLabel:Set(string.format("Pitch: %.1f°", pitch))
+    RollLabel:Set(string.format("Roll: %.1f°", roll))
+    return speed, altitude, pitch, roll, heading
+end
+
+function flyTaxi(vision)
+    ModeLabel:Set("Mode: 🚖 TAXI")
+    AIState.aiThinking="Ground operations"
+    AIState.decisionReason="Taxiing to runway"
+    setThrottle(0.3)
+    setBrakes(false)
+    setGear(true)
+    setFlaps(0)
+    setMouseControl(0,0)
+    if vision.obstacleAhead then
+        AIState.aiThinking="OBSTACLE! Stopping!"
+        setBrakes(true)
+        setThrottle(0)
+    end
+end
+function flyTakeoff(speed,altitude,pitch,vision)
+    ModeLabel:Set("Mode: 🛫 TAKEOFF")
+    setGear(true)
+    setFlaps(2)
+    setBrakes(false)
+    if altitude < 10 then
+        if speed < 100 then
+            AIState.aiThinking="Accelerating for takeoff"
+            AIState.decisionReason=string.format("Speed: %.0f/100 MPH",speed)
+            setThrottle(1.0)
+            setMouseControl(0,0)
+        elseif speed >= 100 and speed < 180 then
+            AIState.aiThinking="ROTATION - Pulling up!"
+            AIState.decisionReason="V1 speed"
+            setThrottle(1.0)
+            setMouseControl(-0.5,0)
+        end
+    else
+        AIState.aiThinking="Climbing after takeoff"
+        AIState.decisionReason=string.format("Alt: %.0fft, climbing",altitude)
+        setThrottle(0.95)
+        local pitchError = 15 - pitch
+        setMouseControl(-pitchError*0.08,0)
+        if altitude > 300 then setGear(false) AIState.aiThinking="Gear retracting" end
+        if altitude > 800 then AIState.mode="CLIMB" setFlaps(0) end
+    end
+end
+function flyClimb(altitude,pitch,speed)
+    ModeLabel:Set("Mode: ⬆️ CLIMB")
+    AIState.aiThinking=string.format("Climbing to %.0fft",AIState.targetAltitude)
+    AIState.decisionReason=string.format("%.0fft remaining",AIState.targetAltitude-altitude)
+    setGear(false)
+    setFlaps(0)
+    setThrottle(0.9)
+    local targetPitch=12
+    local pitchError=targetPitch-pitch
+    setMouseControl(-pitchError*0.1,0)
+    if altitude>=AIState.targetAltitude-200 then
+        AIState.mode="CRUISE"
+        AIState.aiThinking="Leveling off"
+    end
+end
+function flyCruise(altitude,speed,pitch,roll,heading,vision)
+    ModeLabel:Set("Mode: ✈️ CRUISE")
+    setGear(false)
+    setFlaps(0)
+    local altError=AIState.targetAltitude-altitude
+    local speedError=AIState.targetSpeed-speed
+    AIState.aiThinking=string.format("Cruising at %.0fft",altitude)
+    AIState.decisionReason=string.format("Alt: %+.0fft, Speed: %+.0f MPH",altError,speedError)
+    if vision.obstacleAhead then
+        AIState.aiThinking="OBSTACLE! CLIMBING!"
+        AIState.decisionReason="Obstacle at "..math.floor(vision.forwardClear).."m"
+        setThrottle(1.0)
+        setMouseControl(-0.6,0)
+        return
+    end
+    if altError>100 then
+        setThrottle(0.85)
+        local targetPitch=8
+        local pitchError=targetPitch-pitch
+        setMouseControl(-pitchError*0.1,0)
+    elseif altError<-100 then
+        setThrottle(0.65)
+        local targetPitch=-5
+        local pitchError=targetPitch-pitch
+        setMouseControl(-pitchError*0.1,0)
+    else
+        setThrottle(0.75+speedError*0.002)
+        local targetPitch=0
+        local pitchError=targetPitch-pitch
+        setMouseControl(-pitchError*0.12,0)
+    end
+end
+function flyDescent(altitude,pitch)
+    ModeLabel:Set("Mode: ⬇️ DESCENT")
+    AIState.aiThinking="Descending for approach"
+    AIState.decisionReason=string.format("Alt: %.0fft",altitude)
+    setGear(false)
+    setFlaps(1)
+    setThrottle(0.6)
+    local targetPitch=-4
+    local pitchError=targetPitch-pitch
+    setMouseControl(-pitchError*0.12,0)
+    if altitude<500 then AIState.mode="LANDING" end
+end
+function flyLanding(altitude,speed,pitch,vision)
+    ModeLabel:Set("Mode: 🛬 LANDING")
+    setGear(true)
+    setFlaps(3)
+    if altitude>200 then
+        AIState.aiThinking="On approach"
+        AIState.decisionReason=string.format("%.0fft to touchdown",altitude)
+        setThrottle(0.5)
+        local targetPitch=-5
+        local pitchError=targetPitch-pitch
+        setMouseControl(-pitchError*0.15,0)
+    elseif altitude>50 then
+        AIState.aiThinking="Final approach"
+        AIState.decisionReason="Preparing for flare"
+        setThrottle(0.4)
+        local targetPitch=-3
+        local pitchError=targetPitch-pitch
+        setMouseControl(-pitchError*0.18,0)
+    elseif altitude>15 then
+        AIState.aiThinking="FLARE!"
+        AIState.decisionReason="Reducing descent rate"
+        setThrottle(0.25)
+        local targetPitch=3
+        local pitchError=targetPitch-pitch
+        setMouseControl(-pitchError*0.2,0)
+    else
+        AIState.aiThinking="TOUCHDOWN!"
+        AIState.decisionReason="On ground, braking"
+        setThrottle(0)
+        setBrakes(true)
+        setMouseControl(0.05,0)
+        if speed<40 then
+            AIState.landings=AIState.landings+1
+            AIState.mode="TAXI"
+            Rayfield:Notify({Title="✅ Landing Complete!",Content=string.format("Landings: %d",AIState.landings),Duration=3,Image=4483362458})
+        end
+    end
+end
+
+-- Mini overlay updater
+RunService.Heartbeat:Connect(function()
+    thinking.Text = "Thinking: " .. (AIState.aiThinking or "")
+    action.Text = "Action: " .. (AIState.currentAction or "")
+    reason.Text = "Reason: " .. (AIState.decisionReason or "")
+    frame.Visible = (AIState.showMiniAIVision == nil or AIState.showMiniAIVision) and AIState.enabled
+end)
+
+-- Main AI loop with engine lock
+local lastUpdate = tick()
+RunService.Heartbeat:Connect(function()
+    local now = tick()
+    local dt = now - lastUpdate
+    if dt < 0.02 then return end
+    lastUpdate = now
+    local player = Players.LocalPlayer
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local camera = Workspace.CurrentCamera
+    local speed,altitude,pitch,roll,heading = getFlightData(root)
+    AltLabel:Set(string.format("Altitude: %.0fft | Speed: %.0f MPH",altitude,speed))
+    ThinkingLabel:Set("AI: " .. AIState.aiThinking)
+    ActionLabel:Set("Action: " .. AIState.currentAction)
+    ReasonLabel:Set("Reason: " .. AIState.decisionReason)
+    AIState.flightTime = AIState.flightTime + dt
+    AIState.distance = AIState.distance + (root.AssemblyLinearVelocity.Magnitude * dt)
+    TimeLabel:Set(string.format("Flight Time: %.0fs",AIState.flightTime))
+    DistLabel:Set(string.format("Distance: %.0fm",AIState.distance))
+    LandLabel:Set(string.format("Landings: %d",AIState.landings))
+
+    if not AIState.enabled then releaseAllInputs() return end
+
+    -- ENFORCED ENGINE START LOGIC:
+    if not AIState.engineOn then
+        -- Give engine enough time to spool up
+        AIState.currentAction = "STARTING ENGINE"
+        AIState.aiThinking = "Pressing E to start engine..."
+        StatusLabel:Set("Status: ⛽️ Starting engine")
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        wait(0.15)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        wait(0.55)
+        AIState.engineOn = true
+        AIState.currentAction = "ENGINE ON"
+        StatusLabel:Set("Status: ✈️ Engine On")
+        AIState.aiThinking = "Engine started!"
+        return  -- Don't fly yet, just started engine
+    end
+
+    local vision = scanEnvironment(root.Position, camera.CFrame.LookVector)
+    if AIState.mode=="TAXI" then
+        flyTaxi(vision)
+    elseif AIState.mode=="TAKEOFF" then
+        flyTakeoff(speed,altitude,pitch,vision)
+    elseif AIState.mode=="CLIMB" then
+        flyClimb(altitude,pitch,speed)
+    elseif AIState.mode=="CRUISE" then
+        flyCruise(altitude,speed,pitch,roll,heading,vision)
+    elseif AIState.mode=="DESCENT" then
+        flyDescent(altitude,pitch)
+    elseif AIState.mode=="LANDING" then
+        flyLanding(altitude,speed,pitch,vision)
+    end
+end)
+
+Rayfield:Notify({
+    Title = "✈️ Flight AI Ready!",
+    Content = "Full autopilot & mini AI vision overlay active!",
+    Duration = 4,
+    Image = 4483362458,
+})
