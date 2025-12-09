@@ -1,0 +1,177 @@
+local Fluent=loadstring(game:HttpGet("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
+
+local firetouch=firetouchinterest or touchinterest or function(p,t,s)if p and t and s==0 then p.CFrame=t.CFrame end end
+
+local Window=Fluent:CreateWindow{Title="a1q Hub 2025+ | RFL Edition",TabWidth=160,Size=UDim2.fromOffset(720,580),Acrylic=true,Theme="Vynixu"}
+
+local MainTab=Window:AddTab{Title="Main",Icon="home"}
+local VisualsTab=Window:AddTab{Title="Visuals",Icon="eye"}
+local LocalPlayerTab=Window:AddTab{Title="Local Player",Icon="user"}
+local TeamsTab=Window:AddTab{Title="Teams",Icon="users"}
+local MiscTab=Window:AddTab{Title="Misc",Icon="settings"}
+local BallModsTab=Window:AddTab{Title="Ball Mods",Icon="circle"}
+local AutoFeaturesTab=Window:AddTab{Title="Auto-Features",Icon="zap"}
+
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local CollectionService=game:GetService("CollectionService")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local UserInputService=game:GetService("UserInputService")
+local TeleportService=game:GetService("TeleportService")
+local Camera=workspace.CurrentCamera
+local player=Players.LocalPlayer
+
+-- Bypass
+pcall(function()
+    for _,v in getgc(true)do
+        if type(v)=="table"and rawget(v,"gkCheck")then
+            local c=debug.getconstants(v.react)
+            for i,val in pairs(c)do
+                if val=="ignoreReactDecline"or val=="specialTool"then debug.setconstant(v.react,i,"ball")
+                elseif val=="overlapCheck"then rawset(v,"check",function()return true end)debug.setconstant(v.react,i,"check")end
+            end
+        end
+    end
+    for _,v in getgc(true)do
+        if type(v)=="function"and getfenv(v).script and getfenv(v).script.Name:find("Root")then
+            local c=debug.getconstants(v)
+            for i,val in pairs(c)do
+                if val=="NetworkOwner"or val=="getNetworkOwner"then debug.setconstant(v,i,function()return player end)end
+            end
+        end
+    end
+end)
+
+-- REACH SETTINGS
+local reachOn=false
+local reachMode="Normal"  -- Normal, Comp, RFL, Custom
+local customReach=15
+
+-- VISUALIZER CUSTOMIZATION
+local visOn=true
+local visColor=Color3.fromRGB(255,80,80)
+local visTransparency=0.5
+local visMaterial="ForceField"
+
+-- VISUALIZER PART
+local hitbox=Instance.new("Part",workspace)hitbox.Name="a1qVisualizer"hitbox.Anchored=true hitbox.CanCollide=false
+hitbox.Transparency=visTransparency hitbox.Color=visColor hitbox.Material=Enum.Material[visMaterial]
+hitbox.Size=Vector3.new(30,30,30)
+local box=Instance.new("SelectionBox",hitbox)box.LineThickness=0.02 box.Color3=visColor
+
+-- BALL PREDICTOR
+local predOn=false local advPred=false local thick=1.2 local maxBounces=3
+local predLines={}
+local dot=Drawing.new("Circle")dot.Thickness=3 dot.Color=Color3.fromRGB(255,0,0)dot.Filled=true dot.Radius=12 dot.Visible=false
+local timeLabel=Drawing.new("Text")timeLabel.Size=24 timeLabel.Color=Color3.fromRGB(255,50,50)timeLabel.Center=true timeLabel.Outline=true timeLabel.Visible=false
+
+local function getBall()
+    for _,b in CollectionService:GetTagged("Ball")do if b:IsA("BasePart")then return b end end
+    for _,b in workspace:GetDescendants()do if b:IsA("BasePart")and(b.Name:lower():find("ball")or b.Name:lower():find("football"))then return b end end
+end
+
+local function updateVisualizer()
+    local size = reachMode=="Normal" and 30 or reachMode=="Comp" and 60 or reachMode=="RFL" and 150 or customReach
+    hitbox.Size=Vector3.new(size,size,size)
+    hitbox.Color=visColor
+    hitbox.Transparency=visOn and visTransparency or 1
+    hitbox.Material=Enum.Material[visMaterial]
+    box.Color3=visColor
+    box.Transparency=visOn and visTransparency or 1
+end
+
+-- MAIN TAB
+MainTab:AddButton({Title="ACTIVATE REACH",Callback=function()reachOn=not reachOn Fluent:Notify({Title="a1q",Content=reachOn and "REACH ON" or "REACH OFF",Duration=3})end})
+
+MainTab:AddDropdown("ReachMode",{Title="Reach Version",Values={"Normal","Comp","RFL","Custom"},Default="Normal",Callback=function(v)
+    reachMode=v updateVisualizer()
+end})
+
+MainTab:AddSlider("CustomReach",{Title="Custom Reach (Studs)",Min=0,Max=150,Default=15,Rounding=1,Callback=function(v)
+    if reachMode=="Custom" then customReach=v updateVisualizer() end
+end})
+
+-- VISUALS TAB
+VisualsTab:AddToggle("ShowVisualizer",{Title="Show Reach Visualizer",Default=true,Callback=function(v)visOn=v updateVisualizer()end})
+VisualsTab:AddSlider("Transparency",{Title="Transparency",Min=0,Max=1,Default=0.5,Rounding=2,Callback=function(v)visTransparency=v updateVisualizer()end})
+VisualsTab:AddColorpicker("VisualizerColor",{Title="Visualizer Color",Default=Color3.fromRGB(255,80,80),Callback=function(v)visColor=v updateVisualizer()end})
+VisualsTab:AddDropdown("Material",{Title="Material",Values={"ForceField","Neon","SmoothPlastic"},Default="ForceField",Callback=function(v)visMaterial=v updateVisualizer()end})
+
+-- BALL MODS
+BallModsTab:AddToggle("BallPredictor",{Title="Ball Predictor",Default=false,Callback=function(v)predOn=v end})
+BallModsTab:AddToggle("AdvancedPredictor",{Title="Advanced (Dot + Timer)",Default=false,Callback=function(v)advPred=v end})
+BallModsTab:AddSlider("LineThickness",{Title="Line Thickness",Min=0.2,Max=10,Default=1.2,Rounding=1,Callback=function(v)thick=v end})
+BallModsTab:AddSlider("MaxBounces",{Title="Max Bounces",Min=0,Max=10,Default=3,Rounding=0,Callback=function(v)maxBounces=v end})
+
+-- AUTO-FEATURES
+AutoFeaturesTab:AddToggle("AntiVotekick",{Title="Anti Votekick (Auto Rejoin)",Default=false,Callback=function(v)
+    if v then
+        spawn(function()
+            while AutoFeaturesTab.Toggles.AntiVotekick.Value do
+                if player.PlayerGui:FindFirstChild("main") and player.PlayerGui.main:FindFirstChild("voteKick") then
+                    local vk = player.PlayerGui.main.voteKick
+                    if vk.Visible and vk:FindFirstChild("main") and vk.main:FindFirstChild("user") and vk.main.user.Text == player.Name then
+                        if #Players:GetPlayers() <= 1 then
+                            player:Kick()
+                            task.wait()
+                            TeleportService:Teleport(game.PlaceId, player)
+                        else
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+                        end
+                        break
+                    end
+                end
+                task.wait()
+            end
+        end)
+    end
+end})
+
+-- HEARTBEAT
+RunService.Heartbeat:Connect(function()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp=player.Character.HumanoidRootPart
+    local ball=getBall() if not ball then return end
+
+    hitbox.CFrame=hrp.CFrame
+    updateVisualizer()
+
+    local currentReach = reachMode=="Normal" and 15 or reachMode=="Comp" and 30 or reachMode=="RFL" and 75 or customReach
+
+    if reachOn then
+        if (ball.Position-hrp.Position).Magnitude <= currentReach + 10 then
+            for _,name in {"LeftFoot","RightFoot","LeftLowerLeg","RightLowerLeg","Left Leg","Right Leg",
+                           "RightHand","LeftHand","RightLowerArm","LeftLowerArm","RightUpperArm","LeftUpperArm","Head","Torso"}do
+                local limb=player.Character:FindFirstChild(name)
+                if limb then firetouch(limb,ball,0) firetouch(limb,ball,1) end
+            end
+        end
+    end
+
+    -- Ball Predictor
+    if predOn or advPred then
+        for _,l in predLines do if l then l:Destroy() end end predLines={}
+        local pos=ball.Position local vel=ball.AssemblyLinearVelocity local bounce=0
+        while bounce<maxBounces do
+            local result=workspace:Raycast(pos,vel*0.5,RaycastParams.new())
+            local endPos=result and result.Position or pos+vel*0.5
+            local line=Instance.new("Part",workspace)line.Anchored=true line.CanCollide=false line.Material="Neon" line.Color=Color3.fromRGB(0,255,255)
+            line.Size=Vector3.new(thick,thick,(pos-endPos).Magnitude) line.CFrame=CFrame.new((pos+endPos)/2,endPos)
+            table.insert(predLines,line)
+            if result then vel=vel-2*vel:Dot(result.Normal)*result.Normal*0.8 pos=result.Position bounce=bounce+1 else break end
+        end
+        if advPred then
+            local future=ball.Position+ball.AssemblyLinearVelocity*0.42
+            local sp,on=Camera:WorldToViewportPoint(future)
+            if on then dot.Position=Vector2.new(sp.X,sp.Y)dot.Visible=true
+                timeLabel.Text=string.format("%.2fs",(hrp.Position-future).Magnitude/math.max(ball.AssemblyLinearVelocity.Magnitude,1))
+                timeLabel.Position=Vector2.new(sp.X,sp.Y+30)timeLabel.Visible=true
+            else dot.Visible=false timeLabel.Visible=false end
+        end
+    else
+        for _,l in predLines do if l then l:Destroy() end end predLines={}
+        dot.Visible=false timeLabel.Visible=false
+    end
+end)
+
+Fluent:Notify({Title="a1q Hub 2025+",Content="RFL Edition • Custom Visualizer • Ball Predictor • Anti-Votekick • GOD MODE",Duration=12})
