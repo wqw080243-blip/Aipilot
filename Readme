@@ -1,241 +1,219 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
-local Window = Fluent:CreateWindow{
-    Title = "a1q Hub 2025+ | ULTIMATE",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(720, 560),
-    Acrylic = true,
-    Theme = "Vynixu",
-    MinimizeKey = Enum.KeyCode.RightControl
-}
-
-local CombatTab = Window:AddTab{Title="Combat",Icon="sword"}
-local VisualTab = Window:AddTab{Title="Visuals",Icon="eye"}
-local MiscTab = Window:AddTab{Title="Misc",Icon="settings"}
-local TeamsTab = Window:AddTab{Title="Teams",Icon="users"}
-local ExtraTab = Window:AddTab{Title="Extra",Icon="zap"}
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local CollectionService = game:GetService("CollectionService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Camera = workspace.CurrentCamera
-local TeleportService = game:GetService("TeleportService")
-local player = Players.LocalPlayer
-
--- FULL 2025 BYPASS (Ownership + GK + React Bypass)
-pcall(function()
-    for _,v in getgc(true) do
-        if type(v)=="table" and rawget(v,"gkCheck") then
-            local c = debug.getconstants(v.react)
-            for i,val in pairs(c) do
-                if val=="ignoreReactDecline" or val=="specialTool" then debug.setconstant(v.react,i,"ball")
-                elseif val=="overlapCheck" then rawset(v,"check",function()return true end) debug.setconstant(v.react,i,"check") end
+for _,v in pairs(getgc(true)) do 
+    if type(v)=="table" and rawget(v,"gkCheck") then 
+        local c=debug.getconstants(v.react)
+        for i,val in pairs(c) do 
+            if val=="ignoreReactDecline" or val=="specialTool" then 
+                debug.setconstant(v.react,i,"ball")
+            elseif val=="overlapCheck" then 
+                rawset(v,"check",function()return true end)
+                debug.setconstant(v.react,i,"check")
+            end 
+        end 
+    end 
+end
+for _,v in pairs(getgc(true)) do
+    if type(v)=="function" and getfenv(v).script and getfenv(v).script.Name:find("Root") then
+        local c=debug.getconstants(v)
+        for i,val in pairs(c) do
+            if val=="NetworkOwner" or val=="getNetworkOwner" then
+                debug.setconstant(v,i,function()return game.Players.LocalPlayer end)
             end
         end
-    end
-    for _,v in getgc(true) do
-        if type(v)=="function" and getfenv(v).script and getfenv(v).script.Name:find("Root") then
-            local c = debug.getconstants(v)
-            for i,val in pairs(c) do
-                if val=="NetworkOwner" or val=="getNetworkOwner" then debug.setconstant(v,i,function()return player end) end
-            end
-        end
-    end
-end)
-
--- Variables
-local reachOn = false
-local reachDist = 15
-local visOn = true
-local stamOn = false
-local predOn = false
-local advPred = false
-local gkReachOn = false
-local gkReachDist = 30
-local gkVisOn = false
-local antiVotekick = false
-local speedOn = false
-local speedVal = 3
-local thick = 2
-local maxBounces = 6
-local staminaConnection = nil
-
--- Visualizers
-local hitbox = Instance.new("Part", workspace)
-hitbox.Name = "a1qReach"
-hitbox.Anchored = true
-hitbox.CanCollide = false
-hitbox.Transparency = 0.6
-hitbox.Size = Vector3.new(reachDist, reachDist, reachDist)
-hitbox.Color = Color3.fromRGB(255,80,80)
-hitbox.Material = Enum.Material.ForceField
-
-local box = Instance.new("SelectionBox", hitbox)
-box.LineThickness = 0.03
-box.Color3 = Color3.fromRGB(255,80,80)
-
-local gkHitbox = Instance.new("Part", workspace)
-gkHitbox.Name = "a1qGKReach"
-gkHitbox.Anchored = true
-gkHitbox.CanCollide = false
-gkHitbox.Transparency = 0.5
-gkHitbox.Size = Vector3.new(gkReachDist, gkReachDist, gkReachDist)
-gkHitbox.Color = Color3.fromRGB(255,150,150)
-gkHitbox.Material = Enum.Material.Neon
-
-local gkBox = Instance.new("SelectionBox", gkHitbox)
-gkBox.LineThickness = 0.04
-gkBox.Color3 = Color3.fromRGB(255,100,100)
-
--- Prediction
-local predLines = {}
-local dot = Drawing.new("Circle")
-dot.Thickness = 4; dot.Radius = 12; dot.Filled = true; dot.Color = Color3.fromRGB(255,0,0)
-local timeLabel = Drawing.new("Text")
-timeLabel.Size = 24; timeLabel.Center = true; timeLabel.Outline = true; timeLabel.Color = Color3.fromRGB(255,50,50)
-
-local function getBall()
-    for _,b in CollectionService:GetTagged("Ball") do if b:IsA("BasePart") then return b end end
-    for _,b in workspace:GetDescendants() do
-        if b:IsA("BasePart") and (b.Name:lower():find("ball") or b.Name:lower():find("football")) then return b end
     end
 end
 
--- COMBAT TAB
-CombatTab:AddToggle("Leg Reach",{Title="Leg Reach",Default=false,Callback=function(v) reachOn = v end})
-CombatTab:AddSlider("Leg Reach Distance",{Min=3,Max=150,Default=15,Callback=function(v) reachDist = v hitbox.Size = Vector3.new(v,v,v) end})
-CombatTab:AddToggle("Show Leg Visualizer",{Default=true,Callback=function(v) visOn = v end})
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local UserInputService=game:GetService("UserInputService")
+local CollectionService=game:GetService("CollectionService")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local Camera=workspace.CurrentCamera
+local player=Players.LocalPlayer
+local pgui=player:WaitForChild("PlayerGui")
 
-CombatTab:AddToggle("GK Reach",{Title="GK Reach (Hands)",Default=false,Callback=function(v) gkReachOn = v end})
-CombatTab:AddSlider("GK Reach Distance",{Min=15,Max=80,Default=30,Callback=function(v) gkReachDist = v gkHitbox.Size = Vector3.new(v,v,v) end})
-CombatTab:AddToggle("Show GK Visualizer",{Default=true,Callback=function(v) gkVisOn = v end})
+local gui=Instance.new("ScreenGui")
+gui.ResetOnSpawn=false
+gui.Parent=pgui
 
-CombatTab:AddToggle("Infinite Stamina",{Title="Infinite Stamina (Undetected Path)",Default=false,Callback=function(v)
-    stamOn = v
-    if v then
-        Fluent:Notify({Title="a1q",Content="Infinite Stamina ENABLED",Duration=6})
-        local s = player.PlayerScripts.controllers.movementController.stamina
-        s.Value = 100
-        staminaConnection = s:GetPropertyChangedSignal("Value"):Connect(function() s.Value = 100 end)
-    else
-        if staminaConnection then staminaConnection:Disconnect() staminaConnection = nil end
-    end
-end})
+local main=Instance.new("Frame")
+main.Size=UDim2.new(0,270,0,520)
+main.Position=UDim2.new(0.5,-135,0.5,-260)
+main.BackgroundColor3=Color3.fromRGB(5,5,15)
+main.BorderSizePixel=0
+main.Active=true
+main.Draggable=true
+main.Visible=false
+main.Parent=gui
 
--- VISUAL TAB
-VisualTab:AddToggle("Ball Predictor",{Default=false,Callback=function(v) predOn = v end})
-VisualTab:AddToggle("Advanced Predictor",{Title="Adv. Predictor (Dot + Timer)",Default=false,Callback=function(v) advPred = v end})
-VisualTab:AddSlider("Line Thickness",{Min=0.5,Max=10,Default=2,Callback=function(v) thick = v end})
-VisualTab:AddSlider("Max Bounces",{Min=0,Max=15,Default=6,Callback=function(v) maxBounces = v end})
+Instance.new("UICorner",main).CornerRadius=UDim.new(0,20)
+local grad=Instance.new("UIGradient",main)
+grad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(10,10,30)),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0))}
+grad.Rotation=135
+local stroke=Instance.new("UIStroke",main)stroke.Color=Color3.fromRGB(0,255,255)stroke.Thickness=4 stroke.Transparency=0.1
+local glow=Instance.new("UIStroke",main)glow.Color=Color3.fromRGB(0,255,255)glow.Thickness=12 glow.Transparency=0.85 glow.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
 
--- MISC TAB
-MiscTab:AddButton({Title="TP to Ball",Callback=function()
-    local b = getBall()
-    if b and player.Character then player.Character.HumanoidRootPart.CFrame = b.CFrame * CFrame.new(0,5,0) end
-end})
-MiscTab:AddButton({Title="Bring Ball",Callback=function()
-    local b = getBall()
-    if b and player.Character then
-        b.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-4)
-        b.Velocity = Vector3.zero
-        b.RotVelocity = Vector3.zero
-    end
-end})
-MiscTab:AddToggle("Anti Votekick",{Default=false,Callback=function(v)
-    antiVotekick = v
-    if v then
-        spawn(function()
-            while antiVotekick and task.wait() do
-                if player.PlayerGui:FindFirstChild("main") and player.PlayerGui.main:FindFirstChild("voteKick") and player.PlayerGui.main.voteKick.Visible
-                and player.PlayerGui.main.voteKick.main.user.Text == player.Name then
-                    if #Players:GetPlayers() <= 1 then
-                        player:Kick()
-                        task.wait(1)
-                        TeleportService:Teleport(game.PlaceId, player)
-                    else
-                        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-                    end
-                end
-            end
-        end)
-    end
-end})
+local title=Instance.new("TextLabel",main)
+title.Size=UDim2.new(1,0,0,40)title.BackgroundTransparency=1 title.Text="a1q Hub" title.TextColor3=Color3.fromRGB(0,255,255) title.Font=Enum.Font.GothamBlack title.TextSize=26
 
--- TEAMS TAB
-TeamsTab:AddDropdown("Team Changer",{Values={"Home Team","Away Team","Home GK","Away GK","Fans","Home Subs"},Callback=function(v)
-    local map = {["Home Team"]="Home",["Away Team"]="Away",["Home GK"]="Home GK",["Away GK"]="Away GK"}
-    local team = game.Teams:FindFirstChild(map[v] or v)
-    if team then player.Team = team end
-end})
+local close=Instance.new("TextButton",main)
+close.Size=UDim2.new(0,32,0,32)close.Position=UDim2.new(1,-40,0,4)close.BackgroundColor3=Color3.fromRGB(255,40,40)close.Text="X"close.TextColor3=Color3.new(1,1,1)close.Font=Enum.Font.GothamBold close.TextSize=22
+Instance.new("UICorner",close).CornerRadius=UDim.new(0,10)
+close.MouseButton1Click:Connect(function()main.Visible=false end)
 
--- HEARTBEAT LOOP
-RunService.Heartbeat:Connect(function()
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = player.Character.HumanoidRootPart
-    local ball = getBall() if not ball then return end
+local scroll=Instance.new("ScrollingFrame",main)
+scroll.Size=UDim2.new(1,-16,1,-50)scroll.Position=UDim2.new(0,8,0,42)scroll.BackgroundTransparency=1 scroll.ScrollBarThickness=8 scroll.CanvasSize=UDim2.new(0,0,0,800)scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
 
-    -- Leg Reach
-    if reachOn then
-        hitbox.CFrame = hrp.CFrame
-        hitbox.Transparency = visOn and 0.6 or 1
-        if (ball.Position - hrp.Position).Magnitude <= reachDist + 5 then
-            for _,name in {"LeftFoot","RightFoot","LeftLowerLeg","RightLowerLeg"} do
-                local limb = player.Character:FindFirstChild(name)
-                if limb then firetouchinterest(limb, ball, 0) firetouchinterest(limb, ball, 1) end
-            end
-        end
-    end
+local toggleBtn=Instance.new("TextButton",gui)
+toggleBtn.Size=UDim2.new(0,50,0,50)toggleBtn.Position=UDim2.new(0,10,0.5,-25)toggleBtn.BackgroundColor3=Color3.fromRGB(0,180,255)toggleBtn.Text="/"toggleBtn.TextColor3=Color3.new(1,1,1)toggleBtn.TextSize=36 toggleBtn.Font=Enum.Font.GothamBlack toggleBtn.Draggable=true
+Instance.new("UICorner",toggleBtn).CornerRadius=UDim.new(0,25)
+local bstroke=Instance.new("UIStroke",toggleBtn)bstroke.Color=Color3.fromRGB(0,255,255)bstroke.Thickness=2
+toggleBtn.MouseButton1Click:Connect(function()main.Visible=not main.Visible end)
+UserInputService.InputBegan:Connect(function(i,gp)if not gp and (i.KeyCode==Enum.KeyCode.RightControl or i.KeyCode==Enum.KeyCode.LeftControl)then main.Visible=not main.Visible end end)
 
-    -- GK Reach
-    if gkReachOn then
-        gkHitbox.CFrame = hrp.CFrame
-        gkHitbox.Transparency = gkVisOn and 0.5 or 1
-        if (ball.Position - hrp.Position).Magnitude <= gkReachDist + 8 then
-            for _,name in {"RightHand","LeftHand","RightUpperArm","LeftUpperArm"} do
-                local limb = player.Character:FindFirstChild(name)
-                if limb then firetouchinterest(limb, ball, 0) firetouchinterest(limb, ball, 1) end
-            end
-        end
-    end
+local reachOn,reachDist,visOn=false,6,false
+local stamOn,predOn,thick,advPred=false,false,1.2,false
+local gkPullOn,pullStrength=false,80
+local autoFreeOn,autoPenaltyOn,topBinsOn=false,false,false
+local lastKickTime,wasStationary=0,false
+local kickAnimationPlaying=false
+local isDiving=false
 
-    -- Ball Predictor (Advanced + Bounces)
-    for i,v in pairs(predLines) do v:Destroy() end predLines = {}
-    if predOn and ball then
-        local pos = ball.Position
-        local vel = ball.AssemblyLinearVelocity * 0.8
-        local gravity = Vector3.new(0, -workspace.Gravity, 0)
-        local bounces = 0
-        repeat
-            local line = Instance.new("Part", workspace)
-            line.Anchored = true line.CanCollide = false line.Material = Enum.Material.Neon
-            line.Color = Color3.fromRGB(0,255,255)
-            line.Size = Vector3.new(thick, thick, vel.Magnitude * 0.05)
-            line.CFrame = CFrame.new(pos, pos + vel)
-            table.insert(predLines, line)
-            pos += vel * 0.05
-            vel += gravity * 0.05
-            if pos.Y <= 3 and vel.Y < 0 then
-                vel = Vector3.new(vel.X * 0.8, -vel.Y * 0.75, vel.Z * 0.8)
-                bounces += 1
-            end
-        until bounces >= maxBounces or vel.Magnitude < 10
+local hitbox=Instance.new("Part",workspace)hitbox.Name="a1qReach"hitbox.Anchored=true hitbox.CanCollide=false hitbox.Transparency=1 hitbox.Size=Vector3.new(6,6,6)
+local box=Instance.new("SelectionBox",workspace)box.Adornee=hitbox box.LineThickness=0.02 box.Color3=Color3.fromRGB(100,200,255)box.Transparency=1
 
-        if advPred then
-            local future = ball.Position + ball.AssemblyLinearVelocity * 0.45
-            local sp, onScreen = Camera:WorldToViewportPoint(future)
-            if onScreen then
-                dot.Position = Vector2.new(sp.X, sp.Y)
-                dot.Visible = true
-                timeLabel.Text = string.format("%.2fs", (hrp.Position - future).Magnitude / ball.AssemblyLinearVelocity.Magnitude)
-                timeLabel.Position = Vector2.new(sp.X, sp.Y + 30)
-                timeLabel.Visible = true
-            else
-                dot.Visible = false timeLabel.Visible = false
-            end
-        end
-    else
-        dot.Visible = false timeLabel.Visible = false
+local predLine
+local dot=Drawing.new("Circle")dot.Radius=10 dot.Thickness=3 dot.Color=Color3.fromRGB(255,0,0)dot.Filled=true dot.Visible=false
+local timeLabel=Drawing.new("Text")timeLabel.Size=22 timeLabel.Color=Color3.fromRGB(255,50,50)timeLabel.Center=true timeLabel.Outline=true timeLabel.Visible=false
+
+local targetAnimationIds={}
+local function scanToolAnimations()
+    local tools=ReplicatedStorage:FindFirstChild("game")and ReplicatedStorage.game:FindFirstChild("animations")and ReplicatedStorage.game.animations:FindFirstChild("Tools")
+    if tools then for _,v in tools:GetDescendants()do if v:IsA("Animation")then targetAnimationIds[v.AnimationId]=true end end end
+end
+scanToolAnimations()
+
+local char=player.Character or player.CharacterAdded:Wait()
+local hum=char:WaitForChild("Humanoid")
+local hrp=char:WaitForChild("HumanoidRootPart")
+player.CharacterAdded:Connect(function(c)char=c hum=c:WaitForChild("Humanoid")hrp=c:WaitForChild("HumanoidRootPart")end)
+hum.AnimationPlayed:Connect(function(t)if targetAnimationIds[t.Animation.AnimationId]then kickAnimationPlaying=true t.Stopped:Connect(function()kickAnimationPlaying=false end)end end)
+
+hum.StateChanged:Connect(function(_,new)
+    if new==Enum.HumanoidStateType.Freefall and hum.MoveDirection.Magnitude>0 then
+        isDiving=true task.delay(0.6,function()isDiving=false end)
     end
 end)
 
-Fluent:Notify({Title="a1q Hub 2025+",Content="ULTIMATE VERSION LOADED | All features merged & working 100%",Duration=12})
+local function getBall()
+    for _,b in CollectionService:GetTagged("Ball")do if b:IsA("BasePart")then return b end end
+    for _,b in workspace:GetDescendants()do
+        if b:IsA("BasePart")and(b.Name:find("Ball")or b.Name:find("Football"))and b.AssemblyLinearVelocity.Magnitude>5 then return b end
+    end
+end
+
+local y=10
+local function tog(n,c)
+    local b=Instance.new("TextButton",scroll)b.Size=UDim2.new(0,240,0,38)b.Position=UDim2.new(0,15,0,y)
+    b.BackgroundColor3=Color3.fromRGB(25,25,40)b.Text=n.." [OFF]"b.TextColor3=Color3.fromRGB(255,60,60)b.Font=Enum.Font.GothamBold b.TextSize=16
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,10)
+    local s=false
+    b.MouseButton1Click:Connect(function()
+        s=not s b.Text=n.." ["..(s and"ON"or"OFF").."]"
+        b.TextColor3=s and Color3.fromRGB(60,255,60)or Color3.fromRGB(255,60,60)
+        b.BackgroundColor3=s and Color3.fromRGB(0,80,0)or Color3.fromRGB(80,0,0)
+        c(s)
+    end)
+    y=y+46
+end
+local function sld(n,mn,mx,df,c)
+    local f=Instance.new("Frame",scroll)f.Size=UDim2.new(0,240,0,58)f.Position=UDim2.new(0,15,0,y)f.BackgroundColor3=Color3.fromRGB(25,25,35)Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+    local l=Instance.new("TextLabel",f)l.Size=UDim2.new(1,0,0,24)l.BackgroundTransparency=1 l.Text=n..": "..df l.TextColor3=Color3.new(1,1,1)l.Font=Enum.Font.GothamBold l.TextSize=16
+    local bar=Instance.new("TextButton",f)bar.Size=UDim2.new(1,-20,0,22)bar.Position=UDim2.new(0,10,0,32)bar.BackgroundColor3=Color3.fromRGB(40,40,50)bar.Text=""
+    local fill=Instance.new("Frame",bar)fill.Size=UDim2.new(df/mx,0,1,0)fill.BackgroundColor3=Color3.fromRGB(0,220,255)Instance.new("UICorner",fill).CornerRadius=UDim.new(0,8)
+    local dragging=false
+    bar.MouseButton1Down:Connect(function()dragging=true end)bar.MouseButton1Up:Connect(function()dragging=false end)bar.MouseLeave:Connect(function()dragging=false end)
+    RunService.RenderStepped:Connect(function()
+        if dragging then
+            local rel=math.clamp((UserInputService:GetMouseLocation().X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+            fill.Size=UDim2.new(rel,0,1,0)local v=math.floor(mn+(mx-mn)*rel)l.Text=n..": "..v c(v)
+        end
+    end)
+    y=y+66
+end
+
+tog("Leg Reach",function(v)reachOn=v end)
+sld("Reach Distance",3,50,6,function(v)reachDist=v end)
+tog("Show Visualizer",function(v)visOn=v end)
+tog("Infinite Stamina",function(v)stamOn=v end)
+tog("Ball Predictor",function(v)predOn=v end)
+sld("Line Thickness",0.2,10,1.2,function(v)thick=v end)
+tog("Advanced Predictor",function(v)advPred=v end)
+tog("Goalkeeper Pull",function(v)gkPullOn=v end)
+sld("Pull Strength",10,200,80,function(v)pullStrength=v end)
+tog("Auto Free Kick",function(v)autoFreeOn=v end)
+tog("Auto Penalty",function(v)autoPenaltyOn=v end)
+tog("Top Bins",function(v)topBinsOn=v end)
+
+local params=OverlapParams.new()params.FilterType=Enum.RaycastFilterType.Blacklist params.FilterDescendantsInstances={hitbox}
+
+RunService.Heartbeat:Connect(function()
+    if not player.Character or not hrp then return end
+    local ball=getBall()
+
+    if reachOn then
+        hitbox.CFrame=hrp.CFrame hitbox.Size=Vector3.new(reachDist,reachDist,reachDist)
+        box.Transparency=visOn and 0 or 1
+        if ball and (ball.Position-hrp.Position).Magnitude<=reachDist then
+            for _,limb in {char:FindFirstChild("LeftFoot"),char:FindFirstChild("RightFoot")}do
+                if limb then pcall(function()firetouchinterest(limb,ball,0)task.wait()firetouchinterest(limb,ball,1)end)end
+            end
+        end
+    end
+
+    if stamOn then
+        pcall(function()
+            for _,v in player:GetDescendants()do
+                if(v:IsA("NumberValue")or v:IsA("IntValue"))and(v.Name:lower():find("stam")or v.Name:lower():find("energ"))then v.Value=math.huge end
+            end
+        end)
+    end
+
+    if gkPullOn and ball and isDiving then
+        local dist=(ball.Position-hrp.Position).Magnitude
+        if dist<=5 then
+            ball.AssemblyLinearVelocity=ball.AssemblyLinearVelocity+(hrp.Position-ball.Position).Unit*pullStrength*2.5
+        end
+    end
+
+    if kickAnimationPlaying and tick()-lastKickTime>1 and ball then
+        lastKickTime=tick()
+        if (autoFreeOn or autoPenaltyOn)and wasStationary or topBinsOn and not wasStationary then
+            local goalZ=hrp.Position.Z>0 and -52.5 or 52.5
+            local goal=Vector3.new(math.random(-3,3),math.random(3,4.5),goalZ)
+            ball.AssemblyLinearVelocity=(goal-ball.Position).Unit*100+Vector3.new(math.random(-10,10),0,0)
+        end
+    end
+
+    if (predOn or advPred)and ball and ball.AssemblyLinearVelocity.Magnitude>5 then
+        if not workspace:FindFirstChild("a1qPred")then
+            predLine=Instance.new("Part",workspace)predLine.Name="a1qPred"predLine.Anchored=true predLine.CanCollide=false predLine.Material="Neon"predLine.Color=Color3.fromRGB(0,255,255)
+        else predLine=workspace.a1qPred end
+        local vel=ball.AssemblyLinearVelocity
+        local future=ball.Position+vel*0.5
+        local mid=(ball.Position+future)/2
+        predLine.Size=Vector3.new(thick,thick,(ball.Position-future).Magnitude)
+        predLine.CFrame=CFrame.new(mid,future)
+        if advPred then
+            local pos,on=Camera:WorldToViewportPoint(ball.Position+vel*0.4)
+            if on then dot.Position=Vector2.new(pos.X,pos.Y)dot.Visible=true
+                timeLabel.Position=Vector2.new(pos.X,pos.Y+25)
+                timeLabel.Text=string.format("%.2fs",(hrp.Position-(ball.Position+vel*0.4)).Magnitude/vel.Magnitude)
+                timeLabel.Visible=true
+            else dot.Visible=false timeLabel.Visible=false end
+        else dot.Visible=false timeLabel.Visible=false end
+    else if predLine then predLine:Destroy()end dot.Visible=false timeLabel.Visible=false end
+
+    if ball and ball.AssemblyLinearVelocity.Magnitude<5 then wasStationary=true else wasStationary=false end
+end)
+
+print("a1q Hub 2025 - GK Pull + Scrollable Menu + Visualizer Fixed")
